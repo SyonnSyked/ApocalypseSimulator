@@ -4,10 +4,14 @@
 #include <string>
 #include <vector>
 
-struct SimulatorConfig {
+struct CityConfig {
     std::string cityName;
     size_t population = 0;
     float sizeSQKM = 0;
+};
+
+struct SimulatorConfig {
+    std::vector<CityConfig> cities;
     unsigned ageMin = 0, ageMax = 100;
     unsigned hpMin = 70, hpMax = 100;
     unsigned hungerMin = 0, hungerMax = 30;

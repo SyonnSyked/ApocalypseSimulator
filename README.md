@@ -1,6 +1,6 @@
 # Apocalypse Simulator
 
-Apocalypse Simulator is a C++17 simulation using the EnTT entity-component system. It currently creates a configurable city and population and prints the city details.
+Apocalypse Simulator is a C++17 simulation using the EnTT entity-component system. It currently creates configurable cities and populations and prints their details.
 
 ## Requirements
 
@@ -18,10 +18,24 @@ From the repository root in PowerShell:
 ```powershell
 cmake --preset dev
 cmake --build --preset dev
-.\build\dev\ApocSim.exe
+.\build\dev\ApocSim.exe config/simulator.cfg
 ```
 
-Edit `config/simulator.cfg` to set the city name, initial population, city size, and person attribute ranges. The program creates that many people, counts them in the city, and prints the city details. Run it from the repository root so it can find the default configuration, or pass a config file path explicitly, for example `.\build\dev\ApocSim.exe config/simulator.cfg`.
+Edit `config/simulator.cfg` to set city names, initial populations, city sizes, and shared person attribute ranges. Add a `[city]` section for each city:
+
+```ini
+[city]
+city_name = Houston
+population = 1000
+city_size_sq_km = 12.5
+
+[city]
+city_name = Dallas
+population = 500
+city_size_sq_km = 10
+```
+
+The program creates the configured people in each city and prints the city details. The original single-city format without a `[city]` heading still works. Pass the config path as shown above, or run from `build/dev` to use the default `../../config/simulator.cfg` path.
 
 Each person gets a numbered name, a randomly selected gender from the comma-separated `genders` list, and uniformly random whole-number values within the inclusive configured ranges. Age is in years; HP, hunger, thirst, and sleep use 0–100 simulation scales. Higher hunger or thirst means greater need, and higher sleep means more rested. These are starting values, not a demographic or medical model. Person settings may be omitted to use the defaults shown in the supplied config. Food and drink are not yet created by the simulator.
 

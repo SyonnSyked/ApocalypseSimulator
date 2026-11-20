@@ -17,10 +17,30 @@ struct Person {
 };
 
 struct City {
-    const char *cityName;
+    std::string cityName;
     size_t population;
 
     float sizeSQKM;
+};
+
+struct District {
+    std::string cityName;
+    size_t population;
+    size_t shelterAmount;
+
+    float sizeSQKM;
+
+    float foodSupply;
+    float waterSupply;
+};
+
+struct Road {
+    District source;
+    District destination;
+
+    unsigned int maxCapacity;
+
+    float maxFlowRate;
 };
 
 struct FoodItem {
@@ -37,5 +57,6 @@ struct DrinkItem {
 
 struct PersonLocation {
     entt::entity city;
+    entt::entity district;
+    entt::entity road;
 };
-

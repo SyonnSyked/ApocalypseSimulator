@@ -10,7 +10,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(EnTT)
 
-add_library(simulator src/SimulatorConfig.cpp src/Population.cpp)
+add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp)
 target_compile_features(simulator PUBLIC cxx_std_17)
 target_include_directories(simulator PUBLIC src)
 target_link_libraries(simulator PUBLIC EnTT::EnTT)

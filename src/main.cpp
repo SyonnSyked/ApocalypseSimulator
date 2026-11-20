@@ -1,6 +1,6 @@
 #include "Components.h"
-#include "Population.h"
 #include "SimulatorConfig.h"
+#include "World.h"
 
 #include <exception>
 #include <iostream>
@@ -13,31 +13,20 @@ int main(int argc, char **argv)
     }
     SimulatorConfig config;
     try {
-        config = LoadConfig(argc == 2 ? argv[1] : "config/simulator.cfg");
+        config = LoadConfig(argc == 2 ? argv[1] : "../../config/simulator.cfg");
     } catch (const std::exception &error) {
         std::cerr << "Config error: " << error.what() << '\n';
         return 1;
     }
+
     entt::registry world;
-    const auto city = world.create();
-    world.emplace<City>(city, config.cityName.c_str(), size_t{0}, config.sizeSQKM);
-
-    CreatePopulation(world, city, config);
-
-    size_t cityPopulation = 0;
-    const auto people = world.view<Person, PersonLocation>();
-
-    for (const auto person : people) {
-        if (people.get<PersonLocation>(person).city == city) {
-            ++cityPopulation;
-        }
+    StartSimulatedWorld(world, config);
+    for (const auto entity : world.view<City>()) {
+        const auto &city = world.get<City>(entity);
+        std::cout << "City: " << city.cityName << '\n'
+                  << "Size: " << city.sizeSQKM << " sq km\n"
+                  << "Population: " << city.population << '\n';
     }
-
-    auto &cityData = world.get<City>(city);
-    cityData.population = cityPopulation;
-    std::cout << "City: " << cityData.cityName << '\n'
-              << "Size: " << cityData.sizeSQKM << " sq km\n"
-              << "Population: " << cityData.population << '\n';
 
     return 0;
 }
