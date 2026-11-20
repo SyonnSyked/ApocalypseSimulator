@@ -21,7 +21,9 @@ cmake --build --preset dev
 .\build\dev\ApocSim.exe
 ```
 
-Edit `config/simulator.cfg` to set the city name, initial population, and city size in square kilometers. The program creates that many people, counts them in the city, and prints the city details. Run it from the repository root so it can find the default configuration, or pass a config file path explicitly, for example `.\build\dev\ApocSim.exe config/simulator.cfg`. Person attributes currently remain at their default values; food and drink are not yet created by the simulator.
+Edit `config/simulator.cfg` to set the city name, initial population, city size, and person attribute ranges. The program creates that many people, counts them in the city, and prints the city details. Run it from the repository root so it can find the default configuration, or pass a config file path explicitly, for example `.\build\dev\ApocSim.exe config/simulator.cfg`.
+
+Each person gets a numbered name, a randomly selected gender from the comma-separated `genders` list, and uniformly random whole-number values within the inclusive configured ranges. Age is in years; HP, hunger, thirst, and sleep use 0–100 simulation scales. Higher hunger or thirst means greater need, and higher sleep means more rested. These are starting values, not a demographic or medical model. Person settings may be omitted to use the defaults shown in the supplied config. Food and drink are not yet created by the simulator.
 
 For an optimized build, use `cmake --preset release` and `cmake --build --preset release`; the executable is in `build/release`. On Linux or macOS, run `./build/dev/ApocSim` instead. Both presets generate `compile_commands.json` in their build directories.
 
