@@ -28,6 +28,22 @@ SimulatorConfig LoadConfig(const std::string &path)
     CityConfig city;
     bool hasName = false, hasPopulation = false, hasSize = false;
     bool inCity = false, cityFields = false;
+    bool inDistrict = false;
+    DistrictConfig district;
+    std::unordered_map<std::string, bool> districtSeen;
+    auto finishDistrict = [&] {
+        if (districtSeen.size() != 8)
+            throw std::runtime_error("Each district archetype must define all eight range endpoints");
+        if (district.shelterMin > district.shelterMax || district.sizeMin > district.sizeMax ||
+            district.foodMin > district.foodMax || district.waterMin > district.waterMax)
+            throw std::runtime_error("District minimum must not exceed maximum: " + district.districtName);
+        for (const auto &existing : config.districts)
+            if (existing.districtName == district.districtName)
+                throw std::runtime_error("Duplicate district archetype: " + district.districtName);
+        config.districts.push_back(district);
+        district = DistrictConfig{};
+        districtSeen.clear();
+    };
     auto finishCity = [&] {
         if (!hasName || !hasPopulation || !hasSize)
             throw std::runtime_error("Each city must include city_name, population, and city_size_sq_km");
@@ -50,8 +66,18 @@ SimulatorConfig LoadConfig(const std::string &path)
         if (content.empty() || content[0] == '#')
             continue;
         if (content == "[city]") {
+            if (inDistrict) { finishDistrict(); inDistrict = false; }
             if (inCity || cityFields) finishCity();
             inCity = true;
+            continue;
+        }
+        if (content.size() >= 11 && content.substr(0, 10) == "[district " && content.back() == ']') {
+            if (inDistrict) finishDistrict();
+            if (inCity || cityFields) { finishCity(); inCity = false; }
+            district.districtName = std::string(Trim(content.substr(10, content.size() - 11)));
+            if (district.districtName.empty())
+                throw std::runtime_error("Empty district archetype on line " + std::to_string(lineNumber));
+            inDistrict = true;
             continue;
         }
         const auto equals = content.find('=');
@@ -59,6 +85,34 @@ SimulatorConfig LoadConfig(const std::string &path)
             throw std::runtime_error("Expected key = value on line " + std::to_string(lineNumber));
         const auto key = Trim(content.substr(0, equals));
         const auto value = Trim(content.substr(equals + 1));
+        if (inDistrict) {
+            if (!districtSeen.emplace(std::string(key), true).second)
+                throw std::runtime_error("Duplicate district key on line " + std::to_string(lineNumber));
+            if (key == "shelter_min" || key == "shelter_max") {
+                size_t number = 0;
+                const auto parsed = std::from_chars(value.data(), value.data() + value.size(), number);
+                if (value.empty() || parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size())
+                    throw std::runtime_error("Invalid district shelter count on line " + std::to_string(lineNumber));
+                (key == "shelter_min" ? district.shelterMin : district.shelterMax) = number;
+            } else {
+                float *target = nullptr;
+                if (key == "size_min") target = &district.sizeMin;
+                else if (key == "size_max") target = &district.sizeMax;
+                else if (key == "food_min") target = &district.foodMin;
+                else if (key == "food_max") target = &district.foodMax;
+                else if (key == "water_min") target = &district.waterMin;
+                else if (key == "water_max") target = &district.waterMax;
+                if (!target) throw std::runtime_error("Unknown district key on line " + std::to_string(lineNumber));
+                size_t used = 0;
+                float number;
+                try { number = std::stof(std::string(value), &used); }
+                catch (const std::exception &) { throw std::runtime_error("Invalid district value on line " + std::to_string(lineNumber)); }
+                if (used != value.size() || !std::isfinite(number) || number < 0)
+                    throw std::runtime_error("Invalid district value on line " + std::to_string(lineNumber));
+                *target = number;
+            }
+            continue;
+        }
         const bool isCityKey = key == "city_name" || key == "population" || key == "city_size_sq_km";
         if (!isCityKey && !seen.emplace(std::string(key), true).second)
             throw std::runtime_error("Duplicate config key on line " + std::to_string(lineNumber));
@@ -102,6 +156,7 @@ SimulatorConfig LoadConfig(const std::string &path)
                                      std::to_string(lineNumber));
         }
     }
+    if (inDistrict) finishDistrict();
     if (inCity || cityFields) finishCity();
     if (config.cities.empty()) throw std::runtime_error("Config must include at least one city");
     if (config.ageMin > config.ageMax || config.hpMin > config.hpMax ||

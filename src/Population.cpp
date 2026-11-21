@@ -4,7 +4,8 @@
 
 #include <random>
 
-void CreatePopulation(entt::registry &registry, entt::entity city, size_t population, const SimulatorConfig &config)
+void CreatePopulation(entt::registry &registry, entt::entity city, size_t population,
+                      const SimulatorConfig &config, const std::vector<entt::entity> &districts)
 {
     std::mt19937 random(std::random_device{}());
     std::uniform_int_distribution<unsigned> age(config.ageMin, config.ageMax),
@@ -19,6 +20,8 @@ void CreatePopulation(entt::registry &registry, entt::entity city, size_t popula
                    static_cast<uint8_t>(age(random)), static_cast<uint8_t>(hp(random)),
                    static_cast<float>(hunger(random)), static_cast<float>(thirst(random)),
                    static_cast<float>(sleep(random))});
-        registry.emplace<PersonLocation>(newPerson, PersonLocation{city});
+        const auto district = districts.empty() ? entt::null : districts[i % districts.size()];
+        registry.emplace<PersonLocation>(newPerson, PersonLocation{city, district, entt::null});
+        if (district != entt::null) ++registry.get<District>(district).population;
     }
 }

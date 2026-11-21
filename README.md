@@ -44,3 +44,28 @@ For an optimized build, use `cmake --preset release` and `cmake --build --preset
 ## Neovim and clangd
 
 Configure the `dev` preset before opening the project. The project-local `.clangd` points clangd to `build/dev/compile_commands.json`, which supplies the compiler flags and EnTT include directory for completion and diagnostics. Reconfigure after changing CMake targets or dependencies, and restart clangd in Neovim if diagnostics are stale. If you use a different build directory, update `.clangd` to point to that directory.
+
+## District archetypes
+
+Add `[district NAME]` sections after the city and person settings. Each section
+creates one independently randomized district in every city; names may be reused
+across cities but each archetype name must be unique in the config. Define all
+of `shelter_min`, `shelter_max`, `size_min`, `size_max`, `food_min`, `food_max`,
+`water_min`, and `water_max`. Shelter counts are inclusive whole-number ranges;
+other ranges contain nonnegative finite numbers. Size is square kilometers and
+food and water are abstract supply units. The supplied ranges are illustrative,
+not calibrated. District sizes are sampled independently and do not partition
+or constrain the configured city area.
+
+Each city's people are distributed evenly among its districts at creation, and
+`District::population` is the actual initial count, not a separately sampled
+value. Locations retain their city and district entity references; the road is
+initially unset. With no district sections, legacy configs continue to work and
+people have no district assigned. Districts and resources are initialized only;
+no movement, resource consumption, or other simulation is performed yet.
+
+## Concurrency foundation
+
+A reusable worker pool and its ownership rules are documented in
+[docs/CONCURRENCY.md](docs/CONCURRENCY.md). World creation and output remain
+single-threaded; no simulation phases are running yet.

@@ -28,5 +28,13 @@ int main(int argc, char **argv)
                   << "Population: " << city.population << '\n';
     }
 
+    for (const auto entity : world.view<District>()) {
+        const auto &district = world.get<District>(entity);
+        std::cout << "  " << world.get<City>(district.city).cityName << " / "
+                  << district.districtName << ": " << district.population << " people, "
+                  << district.sizeSQKM << " sq km, " << district.shelterAmount << " shelters, "
+                  << district.foodSupply << " food, " << district.waterSupply << " water\n";
+    }
+
     return 0;
 }

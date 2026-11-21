@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.25)
 
 project(ApocSim LANGUAGES CXX)
 
+find_package(Threads REQUIRED)
+
 include(FetchContent)
 FetchContent_Declare(
     EnTT
@@ -10,10 +12,10 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(EnTT)
 
-add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp)
+add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp src/PhaseExecutor.cpp)
 target_compile_features(simulator PUBLIC cxx_std_17)
 target_include_directories(simulator PUBLIC src)
-target_link_libraries(simulator PUBLIC EnTT::EnTT)
+target_link_libraries(simulator PUBLIC EnTT::EnTT Threads::Threads)
 set_target_properties(simulator PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_options(simulator PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall;-Wextra;-Wpedantic>)
 
@@ -26,6 +28,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall;-W
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(phase_executor_test tests/phase_executor.cpp)
+    target_link_libraries(phase_executor_test PRIVATE simulator)
+    add_test(NAME phase_executor COMMAND phase_executor_test)
     add_executable(entt_integration_test tests/entt_integration.cpp)
     target_compile_features(entt_integration_test PRIVATE cxx_std_17)
     set_target_properties(entt_integration_test PROPERTIES CXX_EXTENSIONS OFF)

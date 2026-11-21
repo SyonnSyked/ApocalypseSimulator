@@ -24,7 +24,8 @@ struct City {
 };
 
 struct District {
-    std::string cityName;
+    std::string districtName;
+    entt::entity city = entt::null;
     size_t population;
     size_t shelterAmount;
 
@@ -56,7 +57,7 @@ struct DrinkItem {
 };
 
 struct PersonLocation {
-    entt::entity city;
-    entt::entity district;
-    entt::entity road;
+    entt::entity city = entt::null;
+    entt::entity district = entt::null;
+    entt::entity road = entt::null;
 };

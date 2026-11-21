@@ -4,6 +4,14 @@
 #include <string>
 #include <vector>
 
+struct DistrictConfig {
+    std::string districtName;
+    size_t shelterMin = 0, shelterMax = 0;
+    float sizeMin = 0, sizeMax = 0;
+    float foodMin = 0, foodMax = 0;
+    float waterMin = 0, waterMax = 0;
+};
+
 struct CityConfig {
     std::string cityName;
     size_t population = 0;
@@ -12,6 +20,7 @@ struct CityConfig {
 
 struct SimulatorConfig {
     std::vector<CityConfig> cities;
+    std::vector<DistrictConfig> districts;
     unsigned ageMin = 0, ageMax = 100;
     unsigned hpMin = 70, hpMax = 100;
     unsigned hungerMin = 0, hungerMax = 30;
