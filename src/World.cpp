@@ -4,6 +4,7 @@
 #include "SimulatorConfig.h"
 
 #include <random>
+#include <algorithm>
 #include <vector>
 
 entt::entity CreateDistrict(entt::registry &world, entt::entity city, const DistrictConfig &district)
@@ -32,4 +33,19 @@ entt::entity CreateCity(entt::registry &world, const CityConfig &city, const Sim
 void StartSimulatedWorld(entt::registry &world, const SimulatorConfig &config)
 {
     for (const auto &city : config.cities) CreateCity(world, city, config);
+}
+
+WorldUpdateSummary UpdateWorld(entt::registry &world, std::chrono::hours elapsed)
+{
+    // Illustrative rate: one hunger point per simulated hour, capped at 100.
+    WorldUpdateSummary summary;
+    for (auto entity : world.view<Person>()) {
+        auto &person = world.get<Person>(entity);
+        ++summary.people;
+        summary.hungerBefore += person.hunger;
+        person.hunger = std::min(100.0f, person.hunger + static_cast<float>(elapsed.count()));
+        summary.hungerAfter += person.hunger;
+        if (person.hunger >= 100.0f) ++summary.atMaximumHunger;
+    }
+    return summary;
 }

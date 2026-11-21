@@ -12,7 +12,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(EnTT)
 
-add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp src/PhaseExecutor.cpp)
+add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp src/PhaseExecutor.cpp src/SimulationClock.cpp)
 target_compile_features(simulator PUBLIC cxx_std_17)
 target_include_directories(simulator PUBLIC src)
 target_link_libraries(simulator PUBLIC EnTT::EnTT Threads::Threads)
@@ -28,6 +28,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall;-W
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(simulation_clock_test tests/simulation_clock.cpp)
+    target_link_libraries(simulation_clock_test PRIVATE simulator)
+    add_test(NAME simulation_clock COMMAND simulation_clock_test)
     add_executable(phase_executor_test tests/phase_executor.cpp)
     target_link_libraries(phase_executor_test PRIVATE simulator)
     add_test(NAME phase_executor COMMAND phase_executor_test)

@@ -62,10 +62,28 @@ Each city's people are distributed evenly among its districts at creation, and
 value. Locations retain their city and district entity references; the road is
 initially unset. With no district sections, legacy configs continue to work and
 people have no district assigned. Districts and resources are initialized only;
-no movement, resource consumption, or other simulation is performed yet.
+no movement or resource consumption is performed yet.
+
+## Simulation clock
+
+After creating the world, the program runs five ticks and exits, pausing for one
+real second before each update so its progress can be read. Each
+completed tick represents one simulated hour. As a first illustrative world
+update, each person's hunger increases by one point per hour, capped at 100;
+this rate is a placeholder, not a calibrated model. The clock also measures
+real elapsed time separately, using `steady_clock`. Each tick reports average
+hunger before and after the update and the number of people at maximum hunger.
+The pause is in addition to update time; it is not a fixed real-time schedule.
+Longer runs and configurable pacing can be added to the simulation loop later.
+
+Console colors are grouped by purpose in `src/ConsoleColors.h`. Change the
+`error`, `status`, `tick`, `statistics`, or `city` palette entries to another
+named color in that file, then rebuild. Colors are disabled for redirected
+output and when the `NO_COLOR` environment variable is set. On Windows, a
+console that supports virtual terminal colors is required.
 
 ## Concurrency foundation
 
 A reusable worker pool and its ownership rules are documented in
 [docs/CONCURRENCY.md](docs/CONCURRENCY.md). World creation and output remain
-single-threaded; no simulation phases are running yet.
+single-threaded; the world update does not use the worker pool yet.
