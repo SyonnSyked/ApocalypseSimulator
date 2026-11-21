@@ -24,95 +24,48 @@ int main()
                 "food_min = 5\nfood_max = 5\nwater_min = 6\nwater_max = 6\n";
     }
     auto config = LoadConfig(path);
-    entt::registry world;
+    SimulationWorld world;
     StartSimulatedWorld(world, config);
-    size_t cities = 0;
-    for (auto entity : world.view<City>()) {
-        const auto &city = world.get<City>(entity);
-        size_t inhabitants = 0;
-        for (auto person : world.view<PersonLocation>())
-            if (world.get<PersonLocation>(person).city == entity) ++inhabitants;
-        if ((city.cityName == "Test" && (city.population != 25 || city.sizeSQKM != 1.5f)) ||
-            (city.cityName == "Second" && (city.population != 3 || city.sizeSQKM != 2.5f)) ||
-            (city.cityName != "Test" && city.cityName != "Second") || inhabitants != city.population) return 4;
-        ++cities;
-    }
-    if (cities != 2) return 5;
-    size_t districts = 0;
-    for (auto entity : world.view<District>()) {
-        const auto &district = world.get<District>(entity);
-        if (!world.all_of<City>(district.city)) return 6;
-        size_t residents = 0;
-        for (auto person : world.view<PersonLocation>()) {
-            const auto &location = world.get<PersonLocation>(person);
-            if (location.district == entity) {
-                if (location.city != district.city || location.road != entt::null) return 7;
-                ++residents;
+    config.genders.clear();
+    const auto &registry=world.registry();
+    const auto &store=world.population();
+    if (registry.view<City>().size()!=2 || registry.view<District>().size()!=4 || store.metrics().people!=28) return 1;
+    for (auto city:registry.view<City>()) {
+        const auto &c=registry.get<City>(city);
+        if (c.districts.size()!=2) return 2;
+        std::vector<bool> names(c.population+1);
+        std::size_t total=0;
+        for (auto district:c.districts) {
+            const auto &d=registry.get<District>(district);
+            if (d.city!=city || store.partition(d.partition).count!=d.population) return 3;
+            if (d.districtName=="Shopping") {
+                if (d.shelterAmount<2 || d.shelterAmount>3 || d.sizeSQKM<1 || d.sizeSQKM>2 || d.foodSupply<10 || d.foodSupply>20 || d.waterSupply<30 || d.waterSupply>40) return 4;
+            } else if (d.districtName=="Medical") {
+                if (d.shelterAmount!=4 || d.sizeSQKM!=3 || d.foodSupply!=5 || d.waterSupply!=6) return 5;
+            } else return 6;
+            for (std::size_t i=0;i<d.population;++i) {
+                auto id=store.id(d.partition,i); auto person=store.get(id); auto location=store.location(id);
+                if (person.age!=42 || person.hp!=80 || person.hunger!=12 || person.thirst!=13 || person.sleep!=90 || store.label(person.gender)!="Test gender" || location.city!=city || location.district!=district || location.road!=entt::null) return 7;
+                auto name=store.name(id); auto index=std::stoul(name.substr(7));
+                if (index==0 || index>c.population || names[index]) return 8;
+                names[index]=true; ++total;
             }
         }
-        if (residents != district.population) return 8;
-        if (district.districtName == "Shopping") {
-            if (district.shelterAmount < 2 || district.shelterAmount > 3 ||
-                district.sizeSQKM < 1 || district.sizeSQKM > 2 || district.foodSupply < 10 ||
-                district.foodSupply > 20 || district.waterSupply < 30 || district.waterSupply > 40) return 9;
-        } else if (district.districtName == "Medical") {
-            if (district.shelterAmount != 4 || district.sizeSQKM != 3 ||
-                district.foodSupply != 5 || district.waterSupply != 6) return 10;
-        } else return 11;
-        ++districts;
+        if (total!=c.population) return 9;
     }
-    if (districts != 4) return 12;
-    // Names restart per city, and labels survive destruction of the input configuration.
-    config.genders.clear();
-    size_t count = 0;
-    for (auto entity : world.view<Person, PersonLocation>()) {
-        const auto &person = world.get<Person>(entity);
-        if (PersonName(person).empty() || PersonGender(world, person) != "Test gender" || person.age != 42 ||
-            person.hp != 80 || person.hunger != 12 || person.thirst != 13 || person.sleep != 90 ||
-            !world.all_of<City>(world.get<PersonLocation>(entity).city)) return 1;
-        const auto city = world.get<PersonLocation>(entity).city;
-        const auto limit = world.get<City>(city).population;
-        if (person.nameNumber < 1 || person.nameNumber > limit ||
-            PersonName(person) != "Person " + std::to_string(person.nameNumber)) return 13;
-        ++count;
-    }
-    for (auto city : world.view<City>()) {
-        std::vector<bool> names(world.get<City>(city).population + 1);
-        for (auto entity : world.view<Person, PersonLocation>()) {
-            if (world.get<PersonLocation>(entity).city != city) continue;
-            auto number = world.get<Person>(entity).nameNumber;
-            if (names[number]) return 14;
-            names[number] = true;
-        }
-    }
-    auto ds = world.view<District>();
-    auto it = ds.begin(); auto first = *it++; auto second = *it;
-    auto road = CreateRoad(world, first, second, 5, 1.5f);
-    if (world.get<Road>(road).source != first || world.get<Road>(road).destination != second) return 15;
-    bool badRoad = false;
-    try { CreateRoad(world, first, entt::null, 1, 1); } catch (const std::invalid_argument &) { badRoad = true; }
-    if (!badRoad) return 16;
-    if (count != 28) return 2;
-    {
-        std::ofstream file(path, std::ios::app);
-        file << "water_max = 2\n";
-    }
-    bool rejected = false;
-    try { LoadConfig(path); } catch (const std::exception &) { rejected = true; }
-    SimulatorConfig huge;
-    huge.cities.push_back({"Huge", std::numeric_limits<std::size_t>::max(), 1});
-    entt::registry empty;
-    bool capacityRejected = false;
-    try { StartSimulatedWorld(empty, huge); } catch (const std::length_error &) { capacityRejected = true; }
-    if (!capacityRejected || empty.storage<entt::entity>().free_list() != 0) return 17;
-    huge.cities[0].population = entt::entt_traits<entt::entity>::entity_mask;
-    capacityRejected = false;
-    try { StartSimulatedWorld(empty, huge); } catch (const std::length_error &) { capacityRejected = true; }
-    if (!capacityRejected || empty.storage<entt::entity>().free_list() != 0) return 18;
-    SimulatorConfig noDistrict;
-    noDistrict.cities.push_back({"Empty districts", 2, 1});
-    StartSimulatedWorld(empty, noDistrict);
-    for (auto person : empty.view<PersonLocation>()) if (empty.get<PersonLocation>(person).district != entt::null) return 19;
-    std::remove(path);
-    return rejected ? 0 : 3;
+    auto ds=registry.view<District>(); auto it=ds.begin(); auto a=*it++; auto b=*it;
+    auto road=CreateRoad(world,a,b,5,1.5f);
+    if (registry.get<Road>(road).source!=a || registry.get<Road>(road).destination!=b || registry.get<Road>(road).maxCapacity!=5 || registry.get<Road>(road).maxFlowRate!=1.5f) return 10;
+    bool rejected=false; try { CreateRoad(world,a,entt::null,1,1); } catch (const std::invalid_argument &) { rejected=true; }
+    if (!rejected) return 11;
+    { std::ofstream file(path,std::ios::app); file << "water_max = 2\n"; }
+    rejected=false; try { LoadConfig(path); } catch (const std::exception &) { rejected=true; }
+    std::remove(path); if (!rejected) return 12;
+    SimulatorConfig huge; huge.cities.push_back({"Huge",std::numeric_limits<std::size_t>::max(),1});
+    SimulationWorld empty; rejected=false;
+    try { StartSimulatedWorld(empty,huge); } catch (const std::length_error &) { rejected=true; }
+    if (!rejected || empty.registry().storage<entt::entity>()->free_list()!=0) return 13;
+    SimulatorConfig noDistrict; noDistrict.cities.push_back({"No district",2,1}); StartSimulatedWorld(empty,noDistrict);
+    if (empty.population().location(empty.population().id(1,0)).district!=entt::null) return 14;
+    return 0;
 }

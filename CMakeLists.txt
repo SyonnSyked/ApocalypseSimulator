@@ -32,6 +32,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall;-W
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(population_store_test tests/population_store.cpp)
+    target_link_libraries(population_store_test PRIVATE simulator)
+    add_test(NAME population_store COMMAND population_store_test)
     add_executable(simulation_clock_test tests/simulation_clock.cpp)
     target_link_libraries(simulation_clock_test PRIVATE simulator)
     add_test(NAME simulation_clock COMMAND simulation_clock_test)

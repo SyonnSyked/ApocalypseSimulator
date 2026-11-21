@@ -1,25 +1,28 @@
 #pragma once
-
-#include <entt/entity/registry.hpp>
+#include "Population.h"
 #include <chrono>
 #include <cstddef>
-
 struct DistrictConfig;
 struct CityConfig;
 struct SimulatorConfig;
-
-struct WorldUpdateSummary {
-    std::size_t people = 0;
-    double hungerBefore = 0;
-    double hungerAfter = 0;
-    std::size_t atMaximumHunger = 0;
+struct WorldUpdateSummary { std::size_t people=0; double hungerBefore=0, hungerAfter=0; std::size_t atMaximumHunger=0; };
+class SimulationWorld {
+public:
+    const entt::registry &registry() const { return registry_; }
+    void setPerson(PersonId id, const PersonStats &stats) { population_.set(id, stats); }
+    const PopulationStore &population() const { return population_; }
+private:
+    bool failed_ = false;
+    entt::registry registry_;
+    PopulationStore population_;
+    friend entt::entity CreateRoad(SimulationWorld &, entt::entity, entt::entity, unsigned, float);
+    friend entt::entity CreateDistrict(SimulationWorld &, entt::entity, const DistrictConfig &);
+    friend entt::entity CreateCity(SimulationWorld &, const CityConfig &, const SimulatorConfig &);
+    friend void StartSimulatedWorld(SimulationWorld &, const SimulatorConfig &);
+    friend WorldUpdateSummary UpdateWorld(SimulationWorld &, std::chrono::hours);
 };
-
-entt::entity CreateRoad(entt::registry &world, entt::entity source, entt::entity destination,
-                        unsigned int maxCapacity, float maxFlowRate);
-entt::entity CreateDistrict(entt::registry &world, entt::entity city,
-                            const DistrictConfig &district);
-entt::entity CreateCity(entt::registry &world, const CityConfig &city,
-                        const SimulatorConfig &config);
-void StartSimulatedWorld(entt::registry &world, const SimulatorConfig &config);
-WorldUpdateSummary UpdateWorld(entt::registry &world, std::chrono::hours elapsed);
+entt::entity CreateRoad(SimulationWorld &, entt::entity, entt::entity, unsigned, float);
+entt::entity CreateDistrict(SimulationWorld &, entt::entity, const DistrictConfig &);
+entt::entity CreateCity(SimulationWorld &, const CityConfig &, const SimulatorConfig &);
+void StartSimulatedWorld(SimulationWorld &, const SimulatorConfig &);
+WorldUpdateSummary UpdateWorld(SimulationWorld &, std::chrono::hours);

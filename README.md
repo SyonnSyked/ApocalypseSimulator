@@ -88,46 +88,48 @@ A reusable worker pool and its ownership rules are documented in
 [docs/CONCURRENCY.md](docs/CONCURRENCY.md). World creation and output remain
 single-threaded; the world update does not use the worker pool yet.
 
-## Memory and ownership
+## Population architecture and memory
 
-Run with `--memory` (before or after the optional config path) to print component sizes,
-a raw Person-component estimate, and process working-set/resident measurements where
-supported. The estimate is not measured RAM: it excludes entity IDs, sparse and packed
-indexes, page slack, other components, allocator overhead and the rest of the process.
-Default output is unchanged.
+`SimulationWorld` owns the EnTT registry and the `PopulationStore`. Cities,
+districts and roads remain entities; people and their internal pages are not
+entities. Each city lists its district entities. Each district identifies one
+population partition; a districtless city instead has a private fallback
+partition and its people's district is null. Road endpoints remain district IDs.
+The registry is exposed read-only, so there is no supported district or city
+destruction API; removal must eventually coordinate roads and partitions.
 
-A `Person` stores a 32-bit city-local generated-name number, a 32-bit gender index,
-two byte-sized age/HP values and three unchanged `float` vital values. `PersonName`
-reconstructs the name on demand; `PersonGender` resolves the index through labels
-owned by the registry context. The registry copies and deduplicates labels, so the
-configuration may be destroyed. These helpers replace direct `personName` and
-`gender` fields in the source API. The label reference returned by `PersonGender`
-should not be retained while more populations are created, since the label vector
-can grow. Each city starts its name numbers at one.
+Each partition has fixed-size SoA pages of up to 16,384 people, with the final
+page allocated to its required size. The store owns separate age, HP, hunger,
+thirst, sleep and gender-index arrays. A 64-bit `PersonId` combines a stable
+one-based home partition ID and a 32-bit local slot; no address or per-person
+lookup map is involved. IDs remain stable when pages grow. `get` and `SimulationWorld::setPerson`
+read and modify individual statistics; partitions and pages permit bulk scans.
+Initial city, district and unset road are derived from the partition. There is no
+movement implementation; a future movement system must add current-location
+state without changing the home-based identity.
 
-The registry owns cities, districts, roads, people and locations. A road holds district
-entity IDs, not district copies; `CreateRoad` validates endpoints when creating one.
-Callers that later destroy districts must first remove or update roads and locations
-that reference them, and check `registry.valid` before dereferencing an entity that
-may have been destroyed. Initial location assignment remains round-robin, or null
-when there are no districts. Initialization remains single-threaded.
+The name helper reconstructs `Person N` from the partition's immutable first
+number and round-robin stride. Gender indices resolve to world-owned, deduplicated
+labels returned by value, independent of configuration lifetime. Individual
+float values retain their original precision. World creation is single-threaded;
+`StartSimulatedWorld` requires an empty world and clears partial state if generation
+throws. If direct city or district creation throws, the world is cleared as well;
+all previous entity and person IDs must then be discarded and a new world created. The 32-bit local slot and generated-name representation limits a city
+to 4,294,967,295 people; EnTT's 1,048,575 entity ceiling applies only to cities,
+districts and roads. Allocation failure can impose a much lower practical limit.
 
-On 64-bit MinGW GCC 15.1, the old/new sizes in bytes are: Person 80/24 (alignment
-8/4), PersonLocation 12/12, City 48/48, District 72/72, Road 152/16. At 600,000
-people the raw Person estimate falls from 48,000,000 to 14,400,000 bytes, saving
-33,600,000 bytes (32.04 MiB). A single equivalent release run of the supplied
-configuration on Windows measured a peak working set of 76,005,376 bytes before
-and 41,807,872 bytes after. These process measurements include much more than
-components and will vary across runs and platforms.
+Pass `--memory` with the existing command line to report population, partitions,
+pages, occupied and allocated slots, raw attribute bytes, and process working set
+or resident set where supported. Array bytes exclude page metadata, labels, EnTT,
+allocator overhead and all other application memory. A Windows MinGW GCC 15.1
+release run with the supplied 600,000-person configuration measured a peak
+working set of 16,199,680 bytes, compared with 41,807,872 bytes for the preceding
+per-person EnTT implementation. These are single runs and vary with the system.
+The new arrays occupy 18 bytes per person, or 10,800,000 bytes for that config.
 
-EnTT 3.16's default 32-bit entity type has a 20-bit entity index; at most 1,048,575
-live entities, including cities, districts and roads, fit. Initialization checks the
-whole requested world before creating it. This is an identifier ceiling, not a
-promise that memory is available. Even ignoring that limit, 330 million current
-Person components alone require 7.92 billion bytes (7.38 GiB), and their locations
-another 3.96 billion bytes (3.69 GiB): 11.88 billion bytes (11.06 GiB) before EnTT
-indexes, entity storage, allocation overhead, other world data or the application.
-Thus this optimization does not meet the future 8 GiB goal. A national-scale design
-needs a separate evaluation of entity representation, location storage, iteration,
-and measured peak allocation behavior; merely widening EnTT IDs would add overhead
-without solving the memory budget.
+At 330 million people the arrays alone would require 5.94 billion bytes (5.53 GiB).
+This is a theoretical calculation, not a capacity test: world data, allocator
+and page overhead, future person data and peak resident memory all count toward
+the 8 GiB process target. Future personality or decision data can be keyed by
+stable IDs, but its storage, lifecycle, location changes and memory budget remain
+to be designed and measured. No such behavior exists yet.

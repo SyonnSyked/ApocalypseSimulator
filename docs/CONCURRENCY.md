@@ -45,7 +45,7 @@ call to `run` or occur inside a callback.
    data, not just a call to the executor.
 5. Keep initialization on one thread until its registry mutations and shared
    district counts have an explicit partition and commit design. In particular,
-   `CreatePopulation` currently increments district population directly.
+   Population generation establishes district counts and page contents together.
 6. For repeatable simulations, introduce a configured seed and stable entity or
    event IDs, and derive random draws from those IDs and the tick. Worker-local
    random generators alone do not make outcomes independent of scheduling.
@@ -56,3 +56,9 @@ counts using the same inputs and seed. Test conservation invariants (population,
 resources, and unique locations) as systems are added. Profile release builds
 before parallelizing a phase; the executor itself does not make a phase faster
 or race-free.
+
+Population pages are independently owned array blocks. A future parallel phase can
+partition a stable page list and give each worker exclusive write access to its
+assigned pages. Page creation, registry mutations and changes to shared district
+counters must remain outside that phase and be coordinated at a barrier. The
+current world update is single-threaded.

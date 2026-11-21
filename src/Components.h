@@ -3,23 +3,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <entt/entity/entity.hpp>
-
-struct Person {
-    std::uint32_t nameNumber;
-    std::uint32_t genderIndex;
-    float hunger;
-    float thirst;
-    float sleep;
-    std::uint8_t age;
-    std::uint8_t hp;
-};
 
 struct City {
     std::string cityName;
     size_t population;
 
     float sizeSQKM;
+    std::vector<entt::entity> districts;
+    std::uint32_t fallbackPartition = 0;
 };
 
 struct District {
@@ -32,6 +25,7 @@ struct District {
 
     float foodSupply;
     float waterSupply;
+    std::uint32_t partition = 0;
 };
 
 struct Road {

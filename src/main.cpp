@@ -55,7 +55,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    entt::registry world;
+    SimulationWorld world;
     try {
         StartSimulatedWorld(world, config);
     } catch (const std::exception &error) {
@@ -99,16 +99,16 @@ int main(int argc, char **argv)
               << " ticks, " << clock.GetSimulatedTime().count() << " simulated hours, "
               << realMilliseconds << " ms real elapsed time." << paint(ConsoleColors::reset)
               << "\n\n";
-    for (const auto cityEntity : world.view<City>()) {
-        const auto &city = world.get<City>(cityEntity);
+    for (const auto cityEntity : world.registry().view<City>()) {
+        const auto &city = world.registry().get<City>(cityEntity);
         std::cout << paint(ConsoleColors::city) << "City: " << city.cityName
                   << paint(ConsoleColors::reset) << '\n'
                   << "  Population: " << city.population << '\n'
                   << "  Size: " << city.sizeSQKM << " sq km\n"
                   << "  Districts:\n";
 
-        for (const auto districtEntity : world.view<District>()) {
-            const auto &district = world.get<District>(districtEntity);
+        for (const auto districtEntity : world.registry().view<District>()) {
+            const auto &district = world.registry().get<District>(districtEntity);
             if (district.city != cityEntity)
                 continue;
             std::cout << "    " << district.districtName << '\n'
@@ -122,14 +122,16 @@ int main(int argc, char **argv)
     }
 
     if (memoryStats) {
-        const auto people = world.storage<Person>().size();
+        const auto metrics = world.population().metrics();
+        const auto &registry = world.registry();
         std::cout << "Memory statistics (bytes):\n"
-                  << "  sizeof(Person): " << sizeof(Person)
-                  << "\n  sizeof(PersonLocation): " << sizeof(PersonLocation)
-                  << "\n  sizeof(City): " << sizeof(City)
-                  << "\n  sizeof(District): " << sizeof(District)
-                  << "\n  sizeof(Road): " << sizeof(Road) << "\n  Estimated raw Person components: "
-                  << static_cast<std::uint64_t>(people) * sizeof(Person) << '\n';
+                  << "  Total population: " << metrics.people
+                  << "\n  Cities: " << registry.view<City>().size()
+                  << "\n  Districts: " << registry.view<District>().size()
+                  << "\n  Partitions: " << metrics.partitions << "\n  Pages: " << metrics.pages
+                  << "\n  Occupied slots: " << metrics.people << "\n  Allocated slots: " << metrics.capacity
+                  << "\n  Raw occupied attribute bytes: " << metrics.occupiedBytes
+                  << "\n  Estimated allocated attribute bytes: " << metrics.allocatedBytes << '\n';
 #ifdef _WIN32
         PROCESS_MEMORY_COUNTERS counters{};
         if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))

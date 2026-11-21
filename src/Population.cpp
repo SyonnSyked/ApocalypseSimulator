@@ -1,93 +1,80 @@
 #include "Population.h"
-#include "Components.h"
 #include "SimulatorConfig.h"
-
-#include <random>
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
-#include <algorithm>
 
-std::string PersonName(const Person &person)
-{
-    return "Person " + std::to_string(person.nameNumber);
+PopulationPage::PopulationPage(std::size_t cap) : capacity(cap), hunger(new float[cap]), thirst(new float[cap]),
+    sleep(new float[cap]), gender(new std::uint32_t[cap]), age(new std::uint8_t[cap]), hp(new std::uint8_t[cap]) {}
+std::uint32_t PopulationStore::createPartition(entt::entity city, entt::entity district, std::uint32_t first,
+                                               std::uint32_t stride, std::size_t expected) {
+    if (!stride || expected > UINT32_MAX || partitions_.size() >= UINT32_MAX)
+        throw std::length_error("Population partition exceeds ID limits");
+    partitions_.push_back(PopulationPartition{city, district, first, stride, 0, expected, {}});
+    return static_cast<std::uint32_t>(partitions_.size());
 }
-
-const std::string &PersonGender(const entt::registry &registry, const Person &person)
-{
-    return registry.ctx().get<GenderLabels>().values.at(person.genderIndex);
+std::uint32_t PopulationStore::addLabel(const std::string &value) {
+    auto it = std::find(labels_.begin(), labels_.end(), value);
+    if (it != labels_.end()) return static_cast<std::uint32_t>(it - labels_.begin());
+    if (labels_.size() >= UINT32_MAX) throw std::length_error("Too many gender labels");
+    labels_.push_back(value); return static_cast<std::uint32_t>(labels_.size() - 1);
 }
-
-void ValidatePersonConfig(const SimulatorConfig &config)
-{
-    if (config.genders.empty())
-        throw std::invalid_argument("At least one gender is required");
-    if (config.genders.size() > std::numeric_limits<std::uint32_t>::max())
-        throw std::length_error("Too many gender labels");
-    if (config.ageMin > config.ageMax || config.hpMin > config.hpMax ||
-        config.hungerMin > config.hungerMax || config.thirstMin > config.thirstMax ||
-        config.sleepMin > config.sleepMax || config.ageMax > 100 || config.hpMax > 100 ||
-        config.hungerMax > 100 || config.thirstMax > 100 || config.sleepMax > 100)
-        throw std::invalid_argument("Invalid person attribute range");
+std::string PopulationStore::label(std::uint32_t index) const { return labels_.at(index); }
+const PopulationPartition &PopulationStore::partition(std::uint32_t h) const {
+    if (!h || h > partitions_.size()) throw std::out_of_range("Invalid population partition");
+    return partitions_[h-1];
 }
-
-void ValidateEntityCapacity(const entt::registry &registry, std::size_t additional)
-{
-    const auto used = registry.storage<entt::entity>()->free_list();
-    constexpr auto capacity =
-        static_cast<std::size_t>(entt::entt_traits<entt::entity>::entity_mask);
-    if (used > capacity || additional > capacity - used)
-        throw std::length_error("World exceeds EnTT entity capacity");
+PersonId PopulationStore::id(std::uint32_t h, std::size_t slot) const {
+    if (slot >= partition(h).count) throw std::out_of_range("Invalid person slot");
+    return { (static_cast<std::uint64_t>(h) << 32) | static_cast<std::uint32_t>(slot) };
 }
-
-void CreatePopulation(entt::registry &registry, entt::entity city, size_t population,
-                      const SimulatorConfig &config, const std::vector<entt::entity> &districts)
-{
-    ValidateEntityCapacity(registry, population);
-    if (!registry.valid(city) || !registry.all_of<City>(city))
-        throw std::invalid_argument("Invalid population city");
-    if (population > std::numeric_limits<std::uint32_t>::max())
-        throw std::length_error("Person name number overflow");
-    ValidatePersonConfig(config);
-    for (auto district : districts) {
-        if (!registry.valid(district) || !registry.all_of<District>(district) ||
-            registry.get<District>(district).city != city)
-            throw std::invalid_argument("Invalid population district");
-        if (registry.get<District>(district).population >
-            std::numeric_limits<std::size_t>::max() - population)
-            throw std::overflow_error("District population overflow");
-    }
-    auto &labels = registry.ctx().emplace<GenderLabels>().values;
-    std::vector<std::uint32_t> indices;
-    indices.reserve(config.genders.size());
-    for (const auto &label : config.genders) {
-        auto it = std::find(labels.begin(), labels.end(), label);
-        if (it == labels.end()) {
-            if (labels.size() >= std::numeric_limits<std::uint32_t>::max())
-                throw std::length_error("Too many gender labels");
-            labels.push_back(label);
-            indices.push_back(static_cast<std::uint32_t>(labels.size() - 1));
-        } else
-            indices.push_back(static_cast<std::uint32_t>(it - labels.begin()));
-    }
-    std::mt19937 random(std::random_device{}());
-    std::uniform_int_distribution<unsigned> age(config.ageMin, config.ageMax),
-        hp(config.hpMin, config.hpMax), hunger(config.hungerMin, config.hungerMax),
-        thirst(config.thirstMin, config.thirstMax), sleep(config.sleepMin, config.sleepMax);
-    std::uniform_int_distribution<size_t> gender(0, config.genders.size() - 1);
-    for (size_t i = 0; i < population; ++i) {
-        const auto newPerson = registry.create();
-        const auto genderIndex = indices[gender(random)];
-        const auto personAge = static_cast<std::uint8_t>(age(random));
-        const auto personHp = static_cast<std::uint8_t>(hp(random));
-        const auto personHunger = static_cast<float>(hunger(random));
-        const auto personThirst = static_cast<float>(thirst(random));
-        const auto personSleep = static_cast<float>(sleep(random));
-        registry.emplace<Person>(newPerson, Person{static_cast<std::uint32_t>(i + 1), genderIndex,
-                                                   personHunger, personThirst, personSleep,
-                                                   personAge, personHp});
-        const auto district = districts.empty() ? entt::null : districts[i % districts.size()];
-        registry.emplace<PersonLocation>(newPerson, PersonLocation{city, district, entt::null});
-        if (district != entt::null)
-            ++registry.get<District>(district).population;
-    }
+PersonId PopulationStore::createPerson(std::uint32_t h, const PersonStats &s) {
+    partition(h); auto &p = partitions_[h-1];
+    if (s.gender >= labels_.size()) throw std::out_of_range("Invalid gender index");
+    if (p.count >= p.expected) throw std::length_error("Population partition full");
+    if (p.pages.empty() || p.pages.back().size == p.pages.back().capacity)
+        p.pages.emplace_back(std::min(pageCapacity, p.expected - p.count));
+    auto &page = p.pages.back(); const auto n = page.size++;
+    page.hunger[n]=s.hunger; page.thirst[n]=s.thirst; page.sleep[n]=s.sleep;
+    page.gender[n]=s.gender; page.age[n]=s.age; page.hp[n]=s.hp; ++p.count;
+    return id(h, p.count-1);
+}
+const PopulationPage &PopulationStore::resolve(PersonId value, std::size_t &offset) const {
+    const auto h = static_cast<std::uint32_t>(value.value >> 32);
+    const auto slot = static_cast<std::uint32_t>(value.value);
+    const auto &p = partition(h);
+    if (slot >= p.count) throw std::out_of_range("Invalid person ID");
+    offset = slot % pageCapacity; return p.pages.at(slot / pageCapacity);
+}
+PersonStats PopulationStore::get(PersonId value) const {
+    std::size_t n; const auto &p = resolve(value,n);
+    return {p.hunger[n],p.thirst[n],p.sleep[n],p.gender[n],p.age[n],p.hp[n]};
+}
+void PopulationStore::set(PersonId value, const PersonStats &s) {
+    if (s.gender >= labels_.size()) throw std::out_of_range("Invalid gender index");
+    std::size_t n; resolve(value,n); auto &p = partitions_[static_cast<std::uint32_t>(value.value >> 32)-1].pages[static_cast<std::uint32_t>(value.value)/pageCapacity];
+    p.hunger[n]=s.hunger; p.thirst[n]=s.thirst; p.sleep[n]=s.sleep; p.gender[n]=s.gender; p.age[n]=s.age; p.hp[n]=s.hp;
+}
+std::string PopulationStore::name(PersonId value) const {
+    std::size_t n; resolve(value,n); const auto &p=partition(static_cast<std::uint32_t>(value.value>>32));
+    return "Person " + std::to_string(static_cast<std::uint64_t>(p.firstName) + static_cast<std::uint64_t>(static_cast<std::uint32_t>(value.value))*p.nameStride);
+}
+PersonLocation PopulationStore::location(PersonId value) const {
+    std::size_t n; resolve(value,n); const auto &p=partition(static_cast<std::uint32_t>(value.value>>32));
+    return {p.city,p.district,entt::null};
+}
+PopulationMetrics PopulationStore::metrics() const {
+    PopulationMetrics m; m.partitions=partitions_.size();
+    for (const auto &p: partitions_) { m.people+=p.count; m.pages+=p.pages.size(); for (const auto &page:p.pages) m.capacity+=page.capacity; }
+    m.occupiedBytes=static_cast<std::uint64_t>(m.people)*bytesPerSlot;
+    m.allocatedBytes=static_cast<std::uint64_t>(m.capacity)*bytesPerSlot; return m;
+}
+void ValidatePersonConfig(const SimulatorConfig &c) {
+    if (c.genders.empty() || c.genders.size()>UINT32_MAX) throw std::invalid_argument("Invalid gender labels");
+    if (c.ageMin>c.ageMax || c.hpMin>c.hpMax || c.hungerMin>c.hungerMax || c.thirstMin>c.thirstMax || c.sleepMin>c.sleepMax ||
+        c.ageMax>100 || c.hpMax>100 || c.hungerMax>100 || c.thirstMax>100 || c.sleepMax>100) throw std::invalid_argument("Invalid person attribute range");
+}
+void ValidateEntityCapacity(const entt::registry &r, std::size_t additional) {
+    const auto used=r.storage<entt::entity>()->free_list(); constexpr auto cap=entt::entt_traits<entt::entity>::entity_mask;
+    if (used>cap || additional>cap-used) throw std::length_error("World exceeds EnTT entity capacity");
 }

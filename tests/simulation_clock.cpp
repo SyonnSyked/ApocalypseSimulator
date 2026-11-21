@@ -1,5 +1,6 @@
 #include "Components.h"
 #include "SimulationClock.h"
+#include "SimulatorConfig.h"
 #include "World.h"
 
 #include <cassert>
@@ -10,9 +11,12 @@ int main()
     SimulationClock clock;
     assert(clock.GetTickCount() == 0);
     clock.StartClock();
-    entt::registry world;
-    const auto entity = world.create();
-    world.emplace<Person>(entity, Person{1, 0, 98.0f, 0.0f, 100.0f, 30, 100});
+    SimulationWorld world;
+    SimulatorConfig config; config.cities.push_back({"Test",1,1});
+    StartSimulatedWorld(world,config);
+    auto entity=world.population().id(1,0);
+    auto person=world.population().get(entity); person.hunger=98; person.thirst=0; person.sleep=100;
+    world.setPerson(entity,person);
     for (int i = 0; i < 5; ++i) {
         const auto summary = UpdateWorld(world, std::chrono::hours{1});
         assert(summary.people == 1);
@@ -24,18 +28,16 @@ int main()
         if (i == 1) assert(summary.atMaximumHunger == 1);
         clock.AdvanceTick();
     }
-    world.get<Person>(entity).hunger = 98.25f;
-    world.get<Person>(entity).thirst = 12.5f;
-    world.get<Person>(entity).sleep = 33.75f;
+    person=world.population().get(entity); person.hunger=98.25f; person.thirst=12.5f; person.sleep=33.75f; world.setPerson(entity,person);
     auto fractional = UpdateWorld(world, std::chrono::hours{1});
     assert(fractional.hungerBefore == 98.25 && fractional.hungerAfter == 99.25);
     fractional = UpdateWorld(world, std::chrono::hours{1});
     assert(fractional.hungerAfter == 100.0 && fractional.atMaximumHunger == 1);
-    assert(world.get<Person>(entity).thirst == 12.5f && world.get<Person>(entity).sleep == 33.75f);
+    assert(world.population().get(entity).thirst == 12.5f && world.population().get(entity).sleep == 33.75f);
     clock.EndClock();
     assert(clock.GetTickCount() == 5);
     assert(clock.GetSimulatedTime() == std::chrono::hours{5});
-    assert(world.get<Person>(entity).hunger == 100.0f);
+    assert(world.population().get(entity).hunger == 100.0f);
     const auto elapsed = clock.GetRealElapsedTime();
     clock.AdvanceTick();
     assert(clock.GetTickCount() == 5);
