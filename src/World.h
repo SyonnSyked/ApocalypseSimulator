@@ -15,7 +15,10 @@ struct WorldUpdateSummary {
     std::size_t atMaximumHunger = 0;
 };
 
-entt::entity CreateDistrict(entt::registry &world, entt::entity city, const DistrictConfig &district);
+entt::entity CreateRoad(entt::registry &world, entt::entity source, entt::entity destination,
+                        unsigned int maxCapacity, float maxFlowRate);
+entt::entity CreateDistrict(entt::registry &world, entt::entity city,
+                            const DistrictConfig &district);
 entt::entity CreateCity(entt::registry &world, const CityConfig &city,
                         const SimulatorConfig &config);
 void StartSimulatedWorld(entt::registry &world, const SimulatorConfig &config);

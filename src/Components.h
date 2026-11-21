@@ -6,14 +6,13 @@
 #include <entt/entity/entity.hpp>
 
 struct Person {
-    std::string personName;
-    std::string gender;
-    uint8_t age;
-    uint8_t hp;
-
+    std::uint32_t nameNumber;
+    std::uint32_t genderIndex;
     float hunger;
     float thirst;
     float sleep;
+    std::uint8_t age;
+    std::uint8_t hp;
 };
 
 struct City {
@@ -36,8 +35,8 @@ struct District {
 };
 
 struct Road {
-    District source;
-    District destination;
+    entt::entity source = entt::null;
+    entt::entity destination = entt::null;
 
     unsigned int maxCapacity;
 

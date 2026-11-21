@@ -12,7 +12,8 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(EnTT)
 
-add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp src/PhaseExecutor.cpp src/SimulationClock.cpp)
+add_library(simulator src/SimulatorConfig.cpp src/Population.cpp src/World.cpp
+                      src/PhaseExecutor.cpp src/SimulationClock.cpp)
 target_compile_features(simulator PUBLIC cxx_std_17)
 target_include_directories(simulator PUBLIC src)
 target_link_libraries(simulator PUBLIC EnTT::EnTT Threads::Threads)
@@ -23,6 +24,9 @@ add_executable(${PROJECT_NAME} src/main.cpp)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 target_link_libraries(${PROJECT_NAME} PRIVATE simulator)
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE psapi)
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall;-Wextra;-Wpedantic>)
 

@@ -6,24 +6,52 @@
 #include <random>
 #include <algorithm>
 #include <vector>
+#include <limits>
+#include <stdexcept>
 
-entt::entity CreateDistrict(entt::registry &world, entt::entity city, const DistrictConfig &district)
+entt::entity CreateRoad(entt::registry &world, entt::entity source, entt::entity destination,
+                        unsigned int maxCapacity, float maxFlowRate)
 {
-    static thread_local std::mt19937 random(std::random_device{}());
-    auto real = [&](float min, float max) { return std::uniform_real_distribution<float>(min, max)(random); };
+    if (!world.valid(source) || !world.valid(destination) || !world.all_of<District>(source) ||
+        !world.all_of<District>(destination))
+        throw std::invalid_argument("Invalid road endpoint");
+    ValidateEntityCapacity(world, 1);
     const auto entity = world.create();
-    world.emplace<District>(entity, District{district.districtName, city, 0,
-        std::uniform_int_distribution<size_t>(district.shelterMin, district.shelterMax)(random),
-        real(district.sizeMin, district.sizeMax), real(district.foodMin, district.foodMax),
-        real(district.waterMin, district.waterMax)});
+    world.emplace<Road>(entity, Road{source, destination, maxCapacity, maxFlowRate});
     return entity;
 }
 
-entt::entity CreateCity(entt::registry &world, const CityConfig &city, const SimulatorConfig &config)
+entt::entity CreateDistrict(entt::registry &world, entt::entity city,
+                            const DistrictConfig &district)
 {
+    ValidateEntityCapacity(world, 1);
+    if (!world.valid(city) || !world.all_of<City>(city))
+        throw std::invalid_argument("Invalid district city");
+    static thread_local std::mt19937 random(std::random_device{}());
+    auto real = [&](float min, float max) {
+        return std::uniform_real_distribution<float>(min, max)(random);
+    };
+    const auto entity = world.create();
+    world.emplace<District>(entity, District{district.districtName, city, 0,
+                                             std::uniform_int_distribution<size_t>(
+                                                 district.shelterMin, district.shelterMax)(random),
+                                             real(district.sizeMin, district.sizeMax),
+                                             real(district.foodMin, district.foodMax),
+                                             real(district.waterMin, district.waterMax)});
+    return entity;
+}
+
+entt::entity CreateCity(entt::registry &world, const CityConfig &city,
+                        const SimulatorConfig &config)
+{
+    if (config.districts.size() >= std::numeric_limits<std::size_t>::max() - city.population)
+        throw std::length_error("City entity count overflow");
+    ValidateEntityCapacity(world, city.population + config.districts.size() + 1);
+    ValidatePersonConfig(config);
     const auto entity = world.create();
     world.emplace<City>(entity, City{city.cityName, city.population, city.sizeSQKM});
     std::vector<entt::entity> districts;
+    districts.reserve(config.districts.size());
     for (const auto &district : config.districts)
         districts.push_back(CreateDistrict(world, entity, district));
     CreatePopulation(world, entity, city.population, config, districts);
@@ -32,7 +60,18 @@ entt::entity CreateCity(entt::registry &world, const CityConfig &city, const Sim
 
 void StartSimulatedWorld(entt::registry &world, const SimulatorConfig &config)
 {
-    for (const auto &city : config.cities) CreateCity(world, city, config);
+    std::size_t total = 0;
+    for (const auto &city : config.cities) {
+        if (config.districts.size() >= std::numeric_limits<std::size_t>::max() - city.population ||
+            total > std::numeric_limits<std::size_t>::max() -
+                        (city.population + config.districts.size() + 1))
+            throw std::length_error("World entity count overflow");
+        total += city.population + config.districts.size() + 1;
+    }
+    ValidateEntityCapacity(world, total);
+    ValidatePersonConfig(config);
+    for (const auto &city : config.cities)
+        CreateCity(world, city, config);
 }
 
 WorldUpdateSummary UpdateWorld(entt::registry &world, std::chrono::hours elapsed)
@@ -45,7 +84,8 @@ WorldUpdateSummary UpdateWorld(entt::registry &world, std::chrono::hours elapsed
         summary.hungerBefore += person.hunger;
         person.hunger = std::min(100.0f, person.hunger + static_cast<float>(elapsed.count()));
         summary.hungerAfter += person.hunger;
-        if (person.hunger >= 100.0f) ++summary.atMaximumHunger;
+        if (person.hunger >= 100.0f)
+            ++summary.atMaximumHunger;
     }
     return summary;
 }

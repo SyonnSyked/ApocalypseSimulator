@@ -29,18 +29,23 @@ inline constexpr const char *city = magenta;
 // Do not send escape sequences to redirected output or when NO_COLOR is set.
 inline bool Enable(bool standardError = false)
 {
-    if (std::getenv("NO_COLOR") != nullptr) return false;
+    if (std::getenv("NO_COLOR") != nullptr)
+        return false;
 #ifdef _WIN32
     const int descriptor = standardError ? 2 : 1;
-    if (!_isatty(descriptor)) return false;
+    if (!_isatty(descriptor))
+        return false;
     const HANDLE handle = GetStdHandle(standardError ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
     DWORD mode;
-    return handle != INVALID_HANDLE_VALUE && handle != nullptr && GetConsoleMode(handle, &mode)
-        && SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    return handle != INVALID_HANDLE_VALUE && handle != nullptr && GetConsoleMode(handle, &mode) &&
+           SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #else
     return isatty(standardError ? STDERR_FILENO : STDOUT_FILENO) != 0;
 #endif
 }
 
-inline const char *Use(bool enabled, const char *color) { return enabled ? color : ""; }
+inline const char *Use(bool enabled, const char *color)
+{
+    return enabled ? color : "";
 }
+} // namespace ConsoleColors

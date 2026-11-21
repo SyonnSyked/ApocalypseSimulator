@@ -37,7 +37,7 @@ city_size_sq_km = 10
 
 The program creates the configured people in each city and prints the city details. The original single-city format without a `[city]` heading still works. Pass the config path as shown above, or run from `build/dev` to use the default `../../config/simulator.cfg` path.
 
-Each person gets a numbered name, a randomly selected gender from the comma-separated `genders` list, and uniformly random whole-number values within the inclusive configured ranges. Age is in years; HP, hunger, thirst, and sleep use 0–100 simulation scales. Higher hunger or thirst means greater need, and higher sleep means more rested. These are starting values, not a demographic or medical model. Person settings may be omitted to use the defaults shown in the supplied config. Food and drink are not yet created by the simulator.
+Each person gets a numbered name, a randomly selected gender from the comma-separated `genders` list, and uniformly random whole-number values within the inclusive configured ranges. Age is in years; HP, hunger, thirst, and sleep use 0â€“100 simulation scales. Higher hunger or thirst means greater need, and higher sleep means more rested. These are starting values, not a demographic or medical model. Person settings may be omitted to use the defaults shown in the supplied config. Food and drink are not yet created by the simulator.
 
 For an optimized build, use `cmake --preset release` and `cmake --build --preset release`; the executable is in `build/release`. On Linux or macOS, run `./build/dev/ApocSim` instead. Both presets generate `compile_commands.json` in their build directories.
 
@@ -87,3 +87,47 @@ console that supports virtual terminal colors is required.
 A reusable worker pool and its ownership rules are documented in
 [docs/CONCURRENCY.md](docs/CONCURRENCY.md). World creation and output remain
 single-threaded; the world update does not use the worker pool yet.
+
+## Memory and ownership
+
+Run with `--memory` (before or after the optional config path) to print component sizes,
+a raw Person-component estimate, and process working-set/resident measurements where
+supported. The estimate is not measured RAM: it excludes entity IDs, sparse and packed
+indexes, page slack, other components, allocator overhead and the rest of the process.
+Default output is unchanged.
+
+A `Person` stores a 32-bit city-local generated-name number, a 32-bit gender index,
+two byte-sized age/HP values and three unchanged `float` vital values. `PersonName`
+reconstructs the name on demand; `PersonGender` resolves the index through labels
+owned by the registry context. The registry copies and deduplicates labels, so the
+configuration may be destroyed. These helpers replace direct `personName` and
+`gender` fields in the source API. The label reference returned by `PersonGender`
+should not be retained while more populations are created, since the label vector
+can grow. Each city starts its name numbers at one.
+
+The registry owns cities, districts, roads, people and locations. A road holds district
+entity IDs, not district copies; `CreateRoad` validates endpoints when creating one.
+Callers that later destroy districts must first remove or update roads and locations
+that reference them, and check `registry.valid` before dereferencing an entity that
+may have been destroyed. Initial location assignment remains round-robin, or null
+when there are no districts. Initialization remains single-threaded.
+
+On 64-bit MinGW GCC 15.1, the old/new sizes in bytes are: Person 80/24 (alignment
+8/4), PersonLocation 12/12, City 48/48, District 72/72, Road 152/16. At 600,000
+people the raw Person estimate falls from 48,000,000 to 14,400,000 bytes, saving
+33,600,000 bytes (32.04 MiB). A single equivalent release run of the supplied
+configuration on Windows measured a peak working set of 76,005,376 bytes before
+and 41,807,872 bytes after. These process measurements include much more than
+components and will vary across runs and platforms.
+
+EnTT 3.16's default 32-bit entity type has a 20-bit entity index; at most 1,048,575
+live entities, including cities, districts and roads, fit. Initialization checks the
+whole requested world before creating it. This is an identifier ceiling, not a
+promise that memory is available. Even ignoring that limit, 330 million current
+Person components alone require 7.92 billion bytes (7.38 GiB), and their locations
+another 3.96 billion bytes (3.69 GiB): 11.88 billion bytes (11.06 GiB) before EnTT
+indexes, entity storage, allocation overhead, other world data or the application.
+Thus this optimization does not meet the future 8 GiB goal. A national-scale design
+needs a separate evaluation of entity representation, location storage, iteration,
+and measured peak allocation behavior; merely widening EnTT IDs would add overhead
+without solving the memory budget.

@@ -18,10 +18,14 @@ void SimulationClock::EndClock()
 
 void SimulationClock::AdvanceTick()
 {
-    if (isClockRunning) ++tickCount;
+    if (isClockRunning)
+        ++tickCount;
 }
 
-std::uint64_t SimulationClock::GetTickCount() const { return tickCount; }
+std::uint64_t SimulationClock::GetTickCount() const
+{
+    return tickCount;
+}
 
 std::chrono::hours SimulationClock::GetSimulatedTime() const
 {
@@ -30,6 +34,7 @@ std::chrono::hours SimulationClock::GetSimulatedTime() const
 
 std::chrono::steady_clock::duration SimulationClock::GetRealElapsedTime() const
 {
-    if (isClockRunning) return std::chrono::steady_clock::now() - clockStart;
+    if (isClockRunning)
+        return std::chrono::steady_clock::now() - clockStart;
     return clockEnd - clockStart;
 }

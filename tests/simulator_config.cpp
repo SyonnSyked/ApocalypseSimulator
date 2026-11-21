@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <exception>
 #include <fstream>
+#include <stdexcept>
+#include <limits>
 
 int main()
 {
@@ -60,14 +62,36 @@ int main()
         ++districts;
     }
     if (districts != 4) return 12;
+    // Names restart per city, and labels survive destruction of the input configuration.
+    config.genders.clear();
     size_t count = 0;
     for (auto entity : world.view<Person, PersonLocation>()) {
         const auto &person = world.get<Person>(entity);
-        if (person.personName.empty() || person.gender != "Test gender" || person.age != 42 ||
+        if (PersonName(person).empty() || PersonGender(world, person) != "Test gender" || person.age != 42 ||
             person.hp != 80 || person.hunger != 12 || person.thirst != 13 || person.sleep != 90 ||
             !world.all_of<City>(world.get<PersonLocation>(entity).city)) return 1;
+        const auto city = world.get<PersonLocation>(entity).city;
+        const auto limit = world.get<City>(city).population;
+        if (person.nameNumber < 1 || person.nameNumber > limit ||
+            PersonName(person) != "Person " + std::to_string(person.nameNumber)) return 13;
         ++count;
     }
+    for (auto city : world.view<City>()) {
+        std::vector<bool> names(world.get<City>(city).population + 1);
+        for (auto entity : world.view<Person, PersonLocation>()) {
+            if (world.get<PersonLocation>(entity).city != city) continue;
+            auto number = world.get<Person>(entity).nameNumber;
+            if (names[number]) return 14;
+            names[number] = true;
+        }
+    }
+    auto ds = world.view<District>();
+    auto it = ds.begin(); auto first = *it++; auto second = *it;
+    auto road = CreateRoad(world, first, second, 5, 1.5f);
+    if (world.get<Road>(road).source != first || world.get<Road>(road).destination != second) return 15;
+    bool badRoad = false;
+    try { CreateRoad(world, first, entt::null, 1, 1); } catch (const std::invalid_argument &) { badRoad = true; }
+    if (!badRoad) return 16;
     if (count != 28) return 2;
     {
         std::ofstream file(path, std::ios::app);
@@ -75,6 +99,20 @@ int main()
     }
     bool rejected = false;
     try { LoadConfig(path); } catch (const std::exception &) { rejected = true; }
+    SimulatorConfig huge;
+    huge.cities.push_back({"Huge", std::numeric_limits<std::size_t>::max(), 1});
+    entt::registry empty;
+    bool capacityRejected = false;
+    try { StartSimulatedWorld(empty, huge); } catch (const std::length_error &) { capacityRejected = true; }
+    if (!capacityRejected || empty.storage<entt::entity>().free_list() != 0) return 17;
+    huge.cities[0].population = entt::entt_traits<entt::entity>::entity_mask;
+    capacityRejected = false;
+    try { StartSimulatedWorld(empty, huge); } catch (const std::length_error &) { capacityRejected = true; }
+    if (!capacityRejected || empty.storage<entt::entity>().free_list() != 0) return 18;
+    SimulatorConfig noDistrict;
+    noDistrict.cities.push_back({"Empty districts", 2, 1});
+    StartSimulatedWorld(empty, noDistrict);
+    for (auto person : empty.view<PersonLocation>()) if (empty.get<PersonLocation>(person).district != entt::null) return 19;
     std::remove(path);
     return rejected ? 0 : 3;
 }
