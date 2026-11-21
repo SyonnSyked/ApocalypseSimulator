@@ -1,7 +1,7 @@
 # Concurrency foundation
 
-The application currently creates and prints a world on the calling thread. No
-simulation tick or parallel registry access is enabled. `PhaseExecutor` is a
+The application creates and updates the world on the calling thread. No
+parallel registry access is enabled. `PhaseExecutor` is a
 reusable worker pool for future simulation phases, not an implicit guarantee
 that code run through it is safe. Construct it once for the lifetime of the
 future simulation; do not construct a pool per tick.
