@@ -21,19 +21,24 @@ int main(int argc, char **argv)
 
     entt::registry world;
     StartSimulatedWorld(world, config);
-    for (const auto entity : world.view<City>()) {
-        const auto &city = world.get<City>(entity);
+    for (const auto cityEntity : world.view<City>()) {
+        const auto &city = world.get<City>(cityEntity);
         std::cout << "City: " << city.cityName << '\n'
-                  << "Size: " << city.sizeSQKM << " sq km\n"
-                  << "Population: " << city.population << '\n';
-    }
+                  << "  Population: " << city.population << '\n'
+                  << "  Size: " << city.sizeSQKM << " sq km\n"
+                  << "  Districts:\n";
 
-    for (const auto entity : world.view<District>()) {
-        const auto &district = world.get<District>(entity);
-        std::cout << "  " << world.get<City>(district.city).cityName << " / "
-                  << district.districtName << ": " << district.population << " people, "
-                  << district.sizeSQKM << " sq km, " << district.shelterAmount << " shelters, "
-                  << district.foodSupply << " food, " << district.waterSupply << " water\n";
+        for (const auto districtEntity : world.view<District>()) {
+            const auto &district = world.get<District>(districtEntity);
+            if (district.city != cityEntity) continue;
+            std::cout << "    " << district.districtName << '\n'
+                      << "      Population: " << district.population << '\n'
+                      << "      Size: " << district.sizeSQKM << " sq km\n"
+                      << "      Shelters: " << district.shelterAmount << '\n'
+                      << "      Food: " << district.foodSupply << '\n'
+                      << "      Water: " << district.waterSupply << '\n';
+        }
+        std::cout << '\n';
     }
 
     return 0;
